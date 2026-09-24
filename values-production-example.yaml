@@ -1,0 +1,91 @@
+# ==============================================================================
+# Kubeconfig Factory - Exemplo Produção Multi-Projeto (values-production-example.yaml)
+# ==============================================================================
+# Demonstração com dois projetos distintos e todos os 5 níveis de acesso:
+# viewer | developer | operator | admin | platform-admin
+# ==============================================================================
+
+# ATENÇÃO: bloco não lido pelo chart nem pelos scripts (veja values.yaml).
+cluster:
+  name: "prod-cluster-nutanix"
+  server: "https://k8s.empresa.com.br:6443"
+  certificateAuthorityData: ""
+  insecureSkipTlsVerify: true
+
+# Namespaces que serão criados
+namespaces:
+  - name: "projeto-a"
+    create: true
+    labels:
+      department: "financeiro"
+      environment: "production"
+
+  - name: "projeto-b"
+    create: true
+    labels:
+      department: "ecommerce"
+      environment: "staging"
+
+# Grupos de Acesso Segmentados
+groups:
+  # ─────────────────────────────────────────────
+  # PROJETO A — Namespace: projeto-a
+  # ─────────────────────────────────────────────
+
+  # Somente leitura (relatórios, auditores)
+  - name: "k8s-projeto-a-viewers"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "viewer"
+
+  # Desenvolvedores (deploy de aplicações, logs, exec)
+  - name: "k8s-projeto-a-developers"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "developer"
+
+  # Operadores (inclui secrets, configmaps, hpa, cronjobs)
+  - name: "k8s-projeto-a-operators"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "operator"
+
+  # Administradores do namespace (controle total local)
+  - name: "k8s-projeto-a-admins"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "admin"
+
+  # ─────────────────────────────────────────────
+  # PROJETO B — Namespace: projeto-b
+  # ─────────────────────────────────────────────
+
+  - name: "k8s-projeto-b-viewers"
+    namespace: "projeto-b"
+    scope: "namespace"
+    role: "viewer"
+
+  - name: "k8s-projeto-b-developers"
+    namespace: "projeto-b"
+    scope: "namespace"
+    role: "developer"
+
+  - name: "k8s-projeto-b-operators"
+    namespace: "projeto-b"
+    scope: "namespace"
+    role: "operator"
+
+  - name: "k8s-projeto-b-admins"
+    namespace: "projeto-b"
+    scope: "namespace"
+    role: "admin"
+
+  # ─────────────────────────────────────────────
+  # ADMINISTRAÇÃO GLOBAL DO CLUSTER
+  # ─────────────────────────────────────────────
+
+  # Equipe de Plataforma — ClusterRoleBinding com cluster-admin
+  - name: "k8s-platform-admins"
+    namespace: ""        # Ignorado (escopo é cluster)
+    scope: "cluster"
+    role: "platform-admin"

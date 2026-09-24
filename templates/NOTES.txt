@@ -1,0 +1,48 @@
+================================================================================
+🎉 KUBECONFIG FACTORY — GRUPOS DE ACESSO PROVISIONADOS!
+================================================================================
+
+Namespace(s) criados e grupos de acesso configurados com sucesso.
+
+Hierarquia de Permissões:
+  viewer          → Somente leitura
+  developer       → Deploy e operação limitada
+  operator        → Operação ampliada (inclui secrets, configmaps, jobs)
+  admin           → Administração completa do namespace
+  platform-admin  → Administração global do cluster (ClusterRoleBinding)
+
+--------------------------------------------------------------------------------
+📋 GRUPOS PROVISIONADOS:
+--------------------------------------------------------------------------------
+{{- range $group := .Values.groups }}
+  🔹 {{ $group.name }}
+     Nível      : {{ $group.role }}
+     Escopo     : {{ $group.scope }}{{ if eq $group.scope "namespace" }} → namespace: {{ $group.namespace }}{{ end }}
+     Token      : {{ $group.name }}-token{{ if eq $group.scope "cluster" }} (namespace: kube-system){{ else }} (namespace: {{ $group.namespace }}){{ end }}
+{{ end }}
+--------------------------------------------------------------------------------
+🚀 COMO EXPORTAR OS KUBECONFIGS:
+--------------------------------------------------------------------------------
+
+Windows (PowerShell):
+  .\scripts\export-kubeconfig.ps1
+
+Linux / macOS (Bash):
+  ./scripts/export-kubeconfig.sh
+
+Exportar um grupo específico:
+  .\scripts\export-kubeconfig.ps1 -GroupName "k8s-projeto-a-viewers"
+
+Os arquivos gerados estarão na pasta ./output-kubeconfigs/:
+{{- range $group := .Values.groups }}
+  → output-kubeconfigs/kubeconfig-{{ $group.name }}.yaml
+{{- end }}
+
+--------------------------------------------------------------------------------
+🔍 VERIFICAR RECURSOS CRIADOS:
+--------------------------------------------------------------------------------
+{{- range $ns := .Values.namespaces }}
+  kubectl get sa,secrets,roles,rolebindings -n {{ $ns.name }}
+{{- end }}
+  kubectl get clusterrolebindings | grep kubeconfig-factory
+================================================================================

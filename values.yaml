@@ -1,0 +1,74 @@
+# ==============================================================================
+# Kubeconfig Factory - values.yaml
+# ==============================================================================
+# Modelo baseado em grupos de acesso segmentados por escopo e nível de permissão.
+# Cada grupo recebe uma ServiceAccount, Secret Token e RoleBinding dedicados.
+#
+# Níveis de Permissão Disponíveis:
+#   viewer           → Somente leitura (get, list, watch)
+#   developer        → Deploy e operação limitada (criar/atualizar pods, deployments, logs)
+#   operator         → Operação ampliada (inclui secrets, configmaps, jobs, cronjobs, hpa)
+#   admin            → Administração completa do namespace (inclui RBAC local)
+#   platform-admin   → Administração global via ClusterRole (escopo: cluster)
+# ==============================================================================
+
+# ATENÇÃO: este bloco ainda não é lido por nenhum template nem pelos scripts de
+# exportação. O endpoint vem do parâmetro -Server (PowerShell) / 3º argumento
+# (Bash) ou do contexto atual do kubectl; a CA vem da Secret de cada grupo; o
+# nome do cluster no kubeconfig é sempre "k8s-cluster".
+cluster:
+  # Identificador do cluster que aparecerá no arquivo kubeconfig
+  name: "kubernetes-cluster"
+  # Endpoint da API do Kubernetes
+  server: "https://127.0.0.1:6443"
+  # CA do cluster em base64 (opcional: se vazio e insecureSkipTlsVerify=true, ignora TLS)
+  certificateAuthorityData: ""
+  insecureSkipTlsVerify: false
+
+# ------------------------------------------------------------------------------
+# Namespaces
+# Lista de namespaces a serem criados no cluster.
+# Grupos que referenciam um namespace aqui terão seus recursos criados nele.
+# ------------------------------------------------------------------------------
+namespaces:
+  - name: "projeto-a"
+    create: true
+    labels:
+      environment: "production"
+      managed-by: "kubeconfig-factory"
+    annotations: {}
+
+# ------------------------------------------------------------------------------
+# Grupos de Acesso
+# Cada entrada gera: ServiceAccount + Secret Token + Role (se namespace) + RoleBinding
+# ------------------------------------------------------------------------------
+groups:
+  # Leitura — pode ver recursos, pods, logs, mas não modificar nada
+  - name: "k8s-projeto-a-viewers"
+    namespace: "projeto-a"
+    scope: "namespace"       # "namespace" ou "cluster"
+    role: "viewer"
+
+  # Deploy e Operação Limitada — pode aplicar manifests, ver logs, reiniciar pods
+  - name: "k8s-projeto-a-developers"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "developer"
+
+  # Operação Ampliada — tudo do developer + secrets, configmaps, jobs, hpa
+  - name: "k8s-projeto-a-operators"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "operator"
+
+  # Administração do Namespace — controle total dentro do namespace (inclui RBAC local)
+  - name: "k8s-projeto-a-admins"
+    namespace: "projeto-a"
+    scope: "namespace"
+    role: "admin"
+
+  # Administração Global do Cluster — usa ClusterRoleBinding com ClusterRole/cluster-admin
+  - name: "k8s-platform-admins"
+    namespace: ""            # Ignorado no escopo cluster
+    scope: "cluster"
+    role: "platform-admin"

@@ -1,0 +1,179 @@
+{{/*
+  Roles Predefinidas por Nível de Permissão
+  ==========================================
+  Este template gera Roles Kubernetes para cada nível de permissão
+  em cada namespace que possui pelo menos um grupo com scope=namespace.
+
+  Os níveis são criados uma única vez por namespace, sem duplicatas.
+
+  Hierarquia de Permissões:
+  ┌─────────────────┬──────────────────────────────────────────────────────┐
+  │ viewer          │ Somente leitura (get, list, watch)                  │
+  │ developer       │ Deploy limitado (criar/atualizar pods, deployments)  │
+  │ operator        │ Operação ampliada (secrets, configmaps, jobs, hpa)   │
+  │ admin           │ Administração completa do namespace                  │
+  └─────────────────┴──────────────────────────────────────────────────────┘
+
+  O papel "platform-admin" usa ClusterRoleBinding e não precisa de Role local.
+*/}}
+
+{{- /* Coleta namespaces únicos com grupos de escopo namespace */}}
+{{- $namespacesWithGroups := dict }}
+{{- range $group := .Values.groups }}
+  {{- if and (eq $group.scope "namespace") (not (hasKey $namespacesWithGroups $group.namespace)) }}
+    {{- $_ := set $namespacesWithGroups $group.namespace true }}
+  {{- end }}
+{{- end }}
+
+{{- /* Gera as 4 Roles predefinidas para cada namespace */}}
+{{- range $ns, $_ := $namespacesWithGroups }}
+
+# ──────────────────────────────────────────────────────────────────
+# ROLE: viewer — Somente Leitura | Namespace: {{ $ns }}
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubeconfig-factory:viewer"
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "role"
+    kubeconfig-factory/permission-level: "viewer"
+rules:
+  - apiGroups: ["", "apps", "batch", "extensions", "autoscaling", "policy", "networking.k8s.io"]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+      - services
+      - endpoints
+      - configmaps
+      - resourcequotas
+      - limitranges
+      - horizontalpodautoscalers
+      - cronjobs
+      - jobs
+      - ingresses
+      - networkpolicies
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+
+# ──────────────────────────────────────────────────────────────────
+# ROLE: developer — Deploy e Operação Limitada | Namespace: {{ $ns }}
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubeconfig-factory:developer"
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "role"
+    kubeconfig-factory/permission-level: "developer"
+rules:
+  # Leitura de todos os recursos básicos
+  - apiGroups: ["", "apps", "batch", "extensions", "autoscaling", "networking.k8s.io"]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+      - pods/portforward
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+      - services
+      - endpoints
+      - configmaps
+      - resourcequotas
+      - limitranges
+      - horizontalpodautoscalers
+      - cronjobs
+      - jobs
+      - ingresses
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+  # Gestão de deployments e pods (deploy de aplicações)
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets"]
+    verbs: ["create", "update", "patch", "delete"]
+  # Execução e reinicialização de pods
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/portforward"]
+    verbs: ["create", "delete"]
+  # Criação de jobs avulsos
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "delete"]
+
+# ──────────────────────────────────────────────────────────────────
+# ROLE: operator — Operação Ampliada | Namespace: {{ $ns }}
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubeconfig-factory:operator"
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "role"
+    kubeconfig-factory/permission-level: "operator"
+rules:
+  # Permissão total sobre todos os recursos de aplicação
+  - apiGroups: ["", "apps", "batch", "extensions", "autoscaling", "networking.k8s.io"]
+    resources:
+      - pods
+      - pods/log
+      - pods/exec
+      - pods/portforward
+      - pods/status
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+      - services
+      - endpoints
+      - configmaps
+      - secrets
+      - resourcequotas
+      - limitranges
+      - horizontalpodautoscalers
+      - cronjobs
+      - jobs
+      - ingresses
+      - persistentvolumeclaims
+      - serviceaccounts
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Acesso a eventos para diagnóstico
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+# ──────────────────────────────────────────────────────────────────
+# ROLE: admin — Administração do Namespace | Namespace: {{ $ns }}
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubeconfig-factory:admin"
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "role"
+    kubeconfig-factory/permission-level: "admin"
+rules:
+  # Controle total sobre todos os recursos dentro do namespace
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+
+{{- end }}

@@ -1,0 +1,59 @@
+{{/*
+  RoleBindings e ClusterRoleBindings por Grupo
+  =============================================
+  - scope=namespace → RoleBinding referenciando a Role predefinida no namespace
+  - scope=cluster   → ClusterRoleBinding referenciando cluster-admin
+*/}}
+{{- range $group := .Values.groups }}
+
+{{- if eq $group.scope "cluster" }}
+# ──────────────────────────────────────────────────────────────────
+# ClusterRoleBinding — {{ $group.name }} (platform-admin)
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "kubeconfig-factory:%s" $group.name | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "clusterrolebinding"
+    kubeconfig-factory/group: {{ $group.name | quote }}
+    kubeconfig-factory/scope: "cluster"
+    kubeconfig-factory/role: "platform-admin"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: {{ $group.name | quote }}
+    namespace: "kube-system"
+
+{{- else }}
+# ──────────────────────────────────────────────────────────────────
+# RoleBinding — {{ $group.name }} ({{ $group.role }}) | ns: {{ $group.namespace }}
+# ──────────────────────────────────────────────────────────────────
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "kubeconfig-factory:%s" $group.name | quote }}
+  namespace: {{ $group.namespace | quote }}
+  labels:
+    {{- include "kubeconfig-factory.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "rolebinding"
+    kubeconfig-factory/group: {{ $group.name | quote }}
+    kubeconfig-factory/scope: "namespace"
+    kubeconfig-factory/role: {{ $group.role | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "kubeconfig-factory:%s" $group.role | quote }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $group.name | quote }}
+    namespace: {{ $group.namespace | quote }}
+
+{{- end }}
+{{- end }}

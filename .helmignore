@@ -1,0 +1,10 @@
+.git/
+.gitignore
+*.tgz
+.DS_Store
+.idea/
+.vscode/
+*.swp
+scripts/
+# Kubeconfigs exportados contêm tokens; nunca devem entrar no pacote do chart.
+output-kubeconfigs/
